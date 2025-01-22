@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 #include <unordered_map>
+#include <vector>
 #include "help.cpp"
 
 /* Global variables */
@@ -46,16 +47,24 @@ public:
 /* Language Compiler */
 class Compiler {
 private:
-    std::fstream file;
-    Console console;
+    std::fstream file; 
+    Console console; // Console for printing stuff
 
-    int line_n;
-    int line_indx;
-    std::string line;
+    int line_n; // length of each line
+    int line_indx; // index of each line
+    std::string line; // each line stored for processing
 
     int variable_indx = 0;
-
-    enum argument_types {
+    std::string loop_variable_name; // some loop variable
+    int loop_variable_indx = 0;
+    std::vector<std::string> loop; // each line in the loop is stored here
+    
+    // Types of what each argument can be
+    // "hehe" -> string
+    // i -> variable
+    // 123 -> number
+    // 6i" -> error
+    enum argument_types { 
         variable,
         string,
         number,
@@ -74,34 +83,40 @@ public:
     }
 
     // Main function for reading each line of the language
-    void Start() {
+    void Main() {
         line_indx = 0;
-
-        std::pair<std::string, int> instruction;
-        while ( std::getline(file, line) ) {
-            line_n = line.size();
-
-            instruction = Get_Instruction();
-
-            if ( instruction.first == "" ) { console.Print(Console::message_lvl::error, "No instruction found", line_indx); return; }
-            
-            console.Print(console.information, "Instruction: " + instruction.first, line_indx);
-
-            if      ( instruction.first == "print" )  { Print(instruction.second); }
-            else if ( instruction.first == "int" )    { Int(instruction.second); }
-            else if ( instruction.first == "string" ) { String(instruction.second); }
-            else if ( instruction.first == "add" )    { Add(instruction.second); }
-            else if ( instruction.first == "sub" )    { Sub(instruction.second); }
-            else if ( instruction.first == "mul" )    { Mul(instruction.second); }
-            else if ( instruction.first == "div" )    { }
-            else if ( instruction.first == "for")     {}
-            else {
-                console.Print(console.error, "Instruction not recognised ->" + instruction.first, line_indx);
-                return;
-            }
-
-            line_indx ++;
+        while (std::getline(file, line)) {
+            Each_Line_Process(line);
+            line_indx++;
         }
+    }
+private:
+    // Processes each line
+    // Reads instruction in each line and proceeds to instruction's function
+    void Each_Line_Process(const std::string line) {
+        std::pair<std::string, int> instruction;
+        line_n = line.size();
+
+        instruction = Get_Instruction();
+
+        if ( instruction.first == "" ) { console.Print(Console::message_lvl::error, "No instruction found", line_indx); return; }
+        
+        console.Print(console.information, "Instruction: " + instruction.first, line_indx);
+
+        if      ( instruction.first == "print" )  { Print(instruction.second); }
+        else if ( instruction.first == "int" )    { Int(instruction.second); }
+        else if ( instruction.first == "string" ) { String(instruction.second); }
+        else if ( instruction.first == "add" )    { Add(instruction.second); }
+        else if ( instruction.first == "sub" )    { Sub(instruction.second); }
+        else if ( instruction.first == "mul" )    { Mul(instruction.second); }
+        else if ( instruction.first == "div" )    { }
+        else if ( instruction.first == "for")     { For(instruction.second); }
+        else if ( instruction.first == "end")     {}
+        else {
+            console.Print(console.error, "Instruction not recognised ->" + instruction.first, line_indx);
+            return;
+        }
+
     }
 
     // Reads and checks line's instruction
@@ -118,20 +133,22 @@ public:
         return ret;
     }
 
-    // Checks next argument, decides what type of argument it is ( variable / string )  !! TO ADD int !!
+    // Checks next argument and decides what type of argument it is ( check argument_types )
     std::pair<argument_types, std::string> Get_Argument(int &poi) {
         if ( poi >= line_n ) { console.Print(console.error, "No argument provided", line_indx); }
         std::string argument = "";
 
         short type_prediction = 0; // 0 = variable, 1 = string, 2 = number
         bool string_ended = false;
-        if ( line[poi] == '"' ) { type_prediction = 2; }
-        else if ( digits.find(line[poi]) != std::string::npos ) { type_prediction = number; }
+        //std::cout << "Line[poi]: " << line[poi] << ' ' << poi << '\n';
+        if ( line[poi] == '"' ) { type_prediction = 1; }
+        else if ( digits.find(line[poi]) != std::string::npos ) { type_prediction = 2; }
+        //std::cout << "Prediction: " << type_prediction << '\n';
 
         //poi++;
         argument_types type = unknown;
         for (; poi < line_n; poi++) {
-            std::cout << poi << '\n';
+            //std::cout << poi << '\n';
             //if ( string_ended  )    { console.Print(console.error, "String ended, wtf is this -> " + line[poi], line_indx); type = error; break;}
             //if ( line[poi] == '"' ) { string_ended = true; }
             if ( line[poi] == ' ' ) { break; }
@@ -155,17 +172,20 @@ public:
         return std::pair<argument_types, std::string>{type, argument};
     }
 
-    // "print" instruction
-    void Print(int &poi) {
-        console.Print(console.information, "Print detected", line_indx);
+    // "print" instruction ( prints somethign to the screen... )
+    int Print(int &poi) {
+        std::cout << "Printing line: " << line << '\n';
+        //console.Print(console.information, "Print detected", line_indx);
         std::pair<argument_types, std::string> argument_inf = Get_Argument(poi);
-        if ( argument_inf.first == error ) {return;}
+        if ( argument_inf.first == error ) {return 1;}
 
         std::string variable_type;
         if ( argument_inf.first == string ) {
             std::cout << argument_inf.second;
         }
         else if ( argument_inf.first == variable ) {
+            if ( !dic_find(variable_names, argument_inf.second) ) { console.Print(console.error, "Variable doens't exist -> " + argument_inf.second, line_indx); return 1; }
+
             if ( variable_names[argument_inf.second].second == variable_types::int_ ) {
                 std::cout << "Variable: " << argument_inf.second <<", value: " << int_values[variable_names[argument_inf.second].second] <<", type: INT\n";
             }
@@ -176,8 +196,10 @@ public:
                 std::cout << "Variable: " << argument_inf.second <<", value: " << string_values[variable_names[argument_inf.second].second] <<", type: FLOAT\n";
             }
         }
+        return 0;
     }
 
+    // Declares int variable
     int Int(int &poi) {
         //std::cout << poi << ' ' << line_n << '\n';
         std::pair<argument_types, std::string> argument_inf = Get_Argument(poi);
@@ -226,6 +248,7 @@ public:
         return 0;
     }
 
+    // Declares string variable
     int String(int &poi) {
         std::pair<argument_types, std::string> argument1_inf = Get_Argument(poi);
         std::pair<argument_types, std::string> argument2_inf = Get_Argument(poi);
@@ -239,6 +262,7 @@ public:
         variable_indx++;
     }
 
+    // 
     std::string String_Type(variable_types type) {
         if ( type == variable_types::int_ ) { return "INT"; }
         else if ( type == variable_types::float_  ) { return "FLOAT"; }
@@ -246,6 +270,7 @@ public:
         else { return "ERROR"; }
     }
 
+    // Adds somethign to the variable
     int Add(int &poi) {
         std::pair<argument_types, std::string> argument1_inf = Get_Argument(poi);
         std::pair<argument_types, std::string> argument2_inf = Get_Argument(poi);
@@ -301,6 +326,7 @@ public:
         return 0;
     }
 
+    // Substracts something from the variable
     int Sub(int &poi) {
         std::pair<argument_types, std::string> argument1_inf = Get_Argument(poi);
         std::pair<argument_types, std::string> argument2_inf = Get_Argument(poi);
@@ -348,6 +374,7 @@ public:
         return 0;
     }
 
+    // Multipiles variable by something
     int Mul(int &poi) {
         std::pair<argument_types, std::string> argument1_inf = Get_Argument(poi);
         std::pair<argument_types, std::string> argument2_inf = Get_Argument(poi);
@@ -392,13 +419,59 @@ public:
             }
         }
     }
+
+    // For loop:
+    // for variable_name start end step
+    int For(int &poi) {
+        std::pair<argument_types, std::string> variable_inf = Get_Argument(poi); // variable_name
+        std::pair<argument_types, std::string> start_inf = Get_Argument(poi); // start
+        std::pair<argument_types, std::string> end_inf = Get_Argument(poi); // end
+        std::pair<argument_types, std::string> step_inf = Get_Argument(poi); // step
+
+        if ( variable_inf.first != argument_types::variable ) { console.Print(console.error, "1st argumnet must be variable -> " + variable_inf.second, line_indx); return 1;}
+        if ( start_inf.first != argument_types::number ) { console.Print(console.error, "2st argumnet (start) must be number -> " + start_inf.second, line_indx); return 1;}
+        if ( end_inf.first != argument_types::number ) { console.Print(console.error, "3st argumnet (end) must be variable -> " + end_inf.second, line_indx); return 1;}
+        if ( step_inf.first != argument_types::number ) { console.Print(console.error, "4st argumnet (step) must be variable -> " + step_inf.second, line_indx); return 1; }
+
+        while ( std::getline(file, line) && line != "end" ) {
+            std::cout << "Line: " << line << '\n';
+            loop.push_back(line);
+            line_indx++;
+        }
+        std::cout << "Whole loop: \n";
+        for (std::string i : loop) {
+            std::cout << i << '\n';
+        }
+        std::cout << "end\n";
+
+        int start = std::stoi(start_inf.second);
+        int end = std::stoi(end_inf.second);
+        int step = std::stoi(step_inf.second);
+
+        loop_variable_name = variable_inf.second;
+        variable_names[loop_variable_name] = {variable_types::int_, variable_indx};
+        loop_variable_indx = variable_indx;
+        variable_indx++;
+        int_values[loop_variable_indx] = start;
+
+        for (int i = start; i < end; i+=step) {
+            int_values[loop_variable_indx] = i;
+            for (std::string lin : loop) {
+                line = lin;
+                std::cout << "Line: " << lin << '\n';
+                Each_Line_Process(lin);
+            }
+        }
+        variable_names.erase(loop_variable_name);
+        int_values.erase(loop_variable_indx);
+    }
 };
 
 int main() {
     Console cons;
     Compiler comp("text.lang", cons);
 
-    comp.Start();    
+    comp.Main();    
 
     return 0;
 }
