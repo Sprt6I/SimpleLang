@@ -1,1 +1,4 @@
-print "hehe\n"
+int x 10
+print x
+add x x
+print x

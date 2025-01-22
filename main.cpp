@@ -53,12 +53,17 @@ private:
     int line_indx;
     std::string line;
 
+    int variable_indx = 0;
+
     enum argument_types {
         variable,
         string,
+        number,
         error,
         unknown
     };
+
+    std::string digits = "1234567890.";
 public:
 
 public:
@@ -85,7 +90,7 @@ public:
             if      ( instruction.first == "print" )  { Print(instruction.second); }
             else if ( instruction.first == "int" )    { Int(instruction.second); }
             else if ( instruction.first == "string" ) {}
-            else if ( instruction.first == "add" )    {}
+            else if ( instruction.first == "add" )    { Add(instruction.second); }
             else if ( instruction.first == "sub" )    {}
             else if ( instruction.first == "mul" )    {}
             else if ( instruction.first == "div" )    {}
@@ -117,27 +122,35 @@ public:
         if ( poi >= line_n ) { console.Print(console.error, "No argument provided", line_indx); }
         std::string argument = "";
 
-        bool is_string = false; // False = variable, True = string 
+        short type_prediction = 0; // 0 = variable, 1 = string, 2 = number
         bool string_ended = false;
-        if ( line[poi] == '"' ) { is_string = true; }
+        if ( line[poi] == '"' ) { type_prediction = 2; }
+        else if ( digits.find(line[poi]) != std::string::npos ) { type_prediction = number; }
 
-        poi++;
+        //poi++;
         argument_types type = unknown;
         for (; poi < line_n; poi++) {
-            if ( string_ended  )    { console.Print(console.error, "String ended, wtf is this -> " + line[poi], line_indx); type = error; break;}
-            if ( line[poi] == '"' ) { string_ended = true; }
+            std::cout << poi << '\n';
+            //if ( string_ended  )    { console.Print(console.error, "String ended, wtf is this -> " + line[poi], line_indx); type = error; break;}
+            //if ( line[poi] == '"' ) { string_ended = true; }
             if ( line[poi] == ' ' ) { break; }
             argument += line[poi];
         }
+        poi++;
 
         if ( argument == "" ) { console.Print(console.error, "No argument provided", line_indx); type = error; }
 
         if ( type != error) {
-            if ( is_string ) { type = string; }
-            else { type = variable; }
+            if ( type_prediction == 1 ) { type = string; }
+            else if (type_prediction == 0) { type = variable; }
+            else if (type_prediction == 2) { type = number; }
+            else {
+                console.Print(console.error, "Can't decide argument type, in Get_Argument", line_indx);
+                type = error;
+            }
         }
 
-        console.Print(console.information, "Argument inf: " + argument + ", type: " + (type == error ? "Error" : type == variable ? "Variable" : "String"), line_indx);
+        console.Print(console.information, "Argument inf: " + argument + ", type: " + (type == error ? "Error" : type == variable ? "Variable" : type == string ? "String" : "Number"), line_indx);
         return std::pair<argument_types, std::string>{type, argument};
     }
 
@@ -164,10 +177,114 @@ public:
         }
     }
 
-    void Int(int &poi) {
+    int Int(int &poi) {
+        //std::cout << poi << ' ' << line_n << '\n';
         std::pair<argument_types, std::string> argument_inf = Get_Argument(poi);
+        //std::cout << argument_inf.second << '\n';
 
-        //if ( argument_inf.first != argument_types::variable ) { console.Print(console.error, "Argument must be variable_name")}
+        if ( argument_inf.first != argument_types::variable ) { console.Print(console.error, "Argument isn't valid -> " + argument_inf.second, line_indx); return 1; }
+
+        if ( dic_find(variable_names, argument_inf.second) ) { console.Print(console.error, "Varibale already exists ->" + argument_inf.second, line_indx); return 1; }
+
+        variable_names[argument_inf.second] = std::pair<variable_types, int>{variable_types::int_, variable_indx};
+        
+        std::pair<argument_types, std::string> value_inf = Get_Argument(poi);
+        //std::cout << argument_inf.second << ' ' << value_inf.second << '\n';
+        //std::cout << value_inf.second << '\n';
+        std::string type;
+        if ( value_inf.first != argument_types::number && value_inf.first != argument_types::variable) {
+            console.Print(console.error, "Value must be number or variable -> " + value_inf.second, line_indx);
+            return 1;
+        }
+        else if ( value_inf.first == argument_types::number ) {
+            int_values[variable_indx] = std::stoi(value_inf.second);
+            console.Print(console.information, "Variable Created, type: INT value: " + value_inf.second, line_indx);
+            variable_indx++;
+        }
+        else if ( value_inf.first == argument_types::variable ) {
+            std::pair<variable_types, int> adding_var_inf = variable_names[value_inf.second];
+            
+            if ( adding_var_inf.first == variable_types::int_ ) {
+                int_values[variable_indx] = int_values[adding_var_inf.second];
+                console.Print(console.information, "Variable Created, type: INT value: " + int_values[adding_var_inf.second], line_indx);
+                variable_indx++;
+            }
+            else if ( adding_var_inf.first == variable_types::float_ ) {
+                int_values[variable_indx] = float_values[adding_var_inf.second];
+                int val = (int) float_values[adding_var_inf.second];
+                console.Print(console.information, "Variable Created, type: FLOAT value: " + val, line_indx);
+                variable_indx++;
+            }
+            else {
+                console.Print(console.error, "Variable type must be numeric -> " + value_inf.second, line_indx);
+                return 1;
+            }
+            
+        }
+
+        return 0;
+    }
+
+    std::string String_Type(variable_types type) {
+        if ( type == variable_types::int_ ) { return "INT"; }
+        else if ( type == variable_types::float_  ) { return "FLOAT"; }
+        else if ( type == variable_types::string_ ) { return "STRING"; }
+        else { return "ERROR"; }
+    }
+
+    int Add(int &poi) {
+        std::pair<argument_types, std::string> argument1_inf = Get_Argument(poi);
+        std::pair<argument_types, std::string> argument2_inf = Get_Argument(poi);
+        if ( argument1_inf.first != argument_types::variable ) { console.Print(console.error, "1st argument must be a variable!", line_indx); return 1; }
+        
+        std::pair<variable_types, int> argument1_val = variable_names[argument1_inf.second];
+
+        if ( argument2_inf.first == argument_types::variable ) {
+            std::pair<variable_types, int> argument2_val = variable_names[argument2_inf.second];
+
+            if ( argument1_val.first == variable_types::int_ && argument2_val.first == variable_types::int_ ) {
+                int_values[argument1_val.second] += int_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::int_ && argument2_val.first == variable_types::float_ ) {
+                int_values[argument1_val.second] += float_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::float_ && argument2_val.first == variable_types::int_ ) {
+                float_values[argument1_val.second] += int_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::float_ && argument2_val.first == variable_types::float_ ) {
+                float_values[argument1_val.second] += float_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::string_ && argument2_val.first == variable_types::string_ ) {
+
+            }
+            else {
+                console.Print(console.error, "Variable types are incorrect / not implemented :3", line_indx);
+                return 1;
+            }
+        }
+        else if ( argument2_inf.first == argument_types::number ) {
+            if ( argument1_val.first == variable_types::int_ ) {
+                int_values[argument1_val.second] += std::stoi(argument2_inf.second);
+            }
+            else if ( argument1_val.first == variable_types::float_ ) {
+                float_values[argument1_val.second] += std::stoi(argument2_inf.second);
+            }
+            else {
+                console.Print(console.error, "U can't add number to -> " + String_Type(argument1_val.first), line_indx );
+                return 1;
+            }
+        }
+        else if ( argument2_inf.first == argument_types::string ) {
+            if ( argument1_val.first == variable_types::string_ ) {
+                string_values[argument1_val.second] += argument2_inf.second;
+            }
+            else {
+                console.Print(console.error, "U can only add string to string variables !", line_indx);
+                return 1;
+            }
+        }
+
+        return 0;
     }
 };
 
