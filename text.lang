@@ -1,4 +1,5 @@
 int x 10
 print x
-add x x
+mul x 15
+sub x 15
 print x

@@ -89,11 +89,12 @@ public:
 
             if      ( instruction.first == "print" )  { Print(instruction.second); }
             else if ( instruction.first == "int" )    { Int(instruction.second); }
-            else if ( instruction.first == "string" ) {}
+            else if ( instruction.first == "string" ) { String(instruction.second); }
             else if ( instruction.first == "add" )    { Add(instruction.second); }
-            else if ( instruction.first == "sub" )    {}
-            else if ( instruction.first == "mul" )    {}
-            else if ( instruction.first == "div" )    {}
+            else if ( instruction.first == "sub" )    { Sub(instruction.second); }
+            else if ( instruction.first == "mul" )    { Mul(instruction.second); }
+            else if ( instruction.first == "div" )    { }
+            else if ( instruction.first == "for")     {}
             else {
                 console.Print(console.error, "Instruction not recognised ->" + instruction.first, line_indx);
                 return;
@@ -184,7 +185,7 @@ public:
 
         if ( argument_inf.first != argument_types::variable ) { console.Print(console.error, "Argument isn't valid -> " + argument_inf.second, line_indx); return 1; }
 
-        if ( dic_find(variable_names, argument_inf.second) ) { console.Print(console.error, "Varibale already exists ->" + argument_inf.second, line_indx); return 1; }
+        if ( dic_find(variable_names, argument_inf.second) ) { console.Print(console.error, "Variable already exists ->" + argument_inf.second, line_indx); return 1; }
 
         variable_names[argument_inf.second] = std::pair<variable_types, int>{variable_types::int_, variable_indx};
         
@@ -223,6 +224,19 @@ public:
         }
 
         return 0;
+    }
+
+    int String(int &poi) {
+        std::pair<argument_types, std::string> argument1_inf = Get_Argument(poi);
+        std::pair<argument_types, std::string> argument2_inf = Get_Argument(poi);
+
+        if ( argument2_inf.first != argument_types::variable ) { console.Print(console.error, "Something idk -> " + argument1_inf.second, line_indx); }
+        if ( argument2_inf.first != argument_types::string ) { console.Print(console.error, "2nd argument must be a string -> " + argument2_inf.second, line_indx); }
+        if ( dic_find(variable_names, argument1_inf.second) ) { console.Print(console.error, "Variable already exists -> " + argument1_inf.second, line_indx); }
+
+        variable_names[argument1_inf.second] = {variable_types::string_, variable_indx};
+        string_values[variable_indx] = argument2_inf.second;
+        variable_indx++;
     }
 
     std::string String_Type(variable_types type) {
@@ -285,6 +299,98 @@ public:
         }
 
         return 0;
+    }
+
+    int Sub(int &poi) {
+        std::pair<argument_types, std::string> argument1_inf = Get_Argument(poi);
+        std::pair<argument_types, std::string> argument2_inf = Get_Argument(poi);
+        if ( argument1_inf.first != argument_types::variable ) { console.Print(console.error, "1st argument must be a variable!", line_indx); return 1; }
+        
+        std::pair<variable_types, int> argument1_val = variable_names[argument1_inf.second];
+
+        if ( argument2_inf.first == argument_types::variable ) {
+            std::pair<variable_types, int> argument2_val = variable_names[argument2_inf.second];
+
+            if ( argument1_val.first == variable_types::int_ && argument2_val.first == variable_types::int_ ) {
+                int_values[argument1_val.second] -= int_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::int_ && argument2_val.first == variable_types::float_ ) {
+                int_values[argument1_val.second] -= float_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::float_ && argument2_val.first == variable_types::int_ ) {
+                float_values[argument1_val.second] -= int_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::float_ && argument2_val.first == variable_types::float_ ) {
+                float_values[argument1_val.second] -= float_values[argument2_val.second];
+            }
+            else {
+                console.Print(console.error, "Variable types are incorrect / not implemented :3", line_indx);
+                return 1;
+            }
+        }
+        else if ( argument2_inf.first == argument_types::number ) {
+            if ( argument1_val.first == variable_types::int_ ) {
+                int_values[argument1_val.second] -= std::stoi(argument2_inf.second);
+            }
+            else if ( argument1_val.first == variable_types::float_ ) {
+                float_values[argument1_val.second] -= std::stoi(argument2_inf.second);
+            }
+            else {
+                console.Print(console.error, "U can't substract number to -> " + String_Type(argument1_val.first), line_indx );
+                return 1;
+            }
+        }
+        else {
+            console.Print(console.error, "U can only substract number or variables", line_indx);
+            return 1;
+        }
+
+        return 0;
+    }
+
+    int Mul(int &poi) {
+        std::pair<argument_types, std::string> argument1_inf = Get_Argument(poi);
+        std::pair<argument_types, std::string> argument2_inf = Get_Argument(poi);
+
+        if ( argument1_inf.first != argument_types::variable ) { console.Print(console.error, "1st argument must be variable -> " + argument1_inf.second, line_indx); }
+        
+        std::pair<variable_types, int> argument1_val = variable_names[argument2_inf.second];
+
+        if ( argument2_inf.first == argument_types::variable ) {
+            std::pair<variable_types, int> argument2_val = variable_names[argument2_inf.second];
+
+            if ( argument1_val.first == variable_types::int_ && argument2_val.first == variable_types::int_ ) {
+                int_values[argument1_val.second] *= int_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::int_ && argument2_val.first == variable_types::float_ ) {
+                int_values[argument1_val.second] *= float_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::float_ && argument2_val.first == variable_types::int_ ) {
+                float_values[argument1_val.second] *= int_values[argument2_val.second];
+            }
+            else if ( argument1_val.first == variable_types::float_ && argument2_val.first == variable_types::float_ ) {
+                float_values[argument1_val.second] *= float_values[argument2_val.second];
+            }
+            else {
+                console.Print(console.error, "Argument types not compatiable / implemented :3", line_indx);
+                return 1;
+            }
+        }
+        else if ( argument2_inf.first == argument_types::number ) {
+            if ( argument1_val.first == variable_types::int_ ) {
+                int_values[argument1_val.second] *= std::stoi(argument2_inf.second);
+            }
+            else if ( argument1_val.first == variable_types::float_ ) {
+                float_values[argument1_val.second] *= std::stoi(argument2_inf.second);
+            }
+            else if ( argument1_val.first == variable_types::string_ ) {
+                int x = std::stoi(argument2_inf.second);
+                std::string temp = string_values[argument1_val.second];
+                for (int j = 0; j < x; j++) {
+                    string_values[argument1_val.second] += temp;
+                }
+            }
+        }
     }
 };
 
