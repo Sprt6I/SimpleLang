@@ -4,6 +4,7 @@
 #include <utility>
 #include <unordered_map>
 #include <vector>
+#include <algorithm>
 #include "help.cpp"
 
 /* Global variables */
@@ -50,14 +51,23 @@ private:
     std::fstream file; 
     Console console; // Console for printing stuff
 
+    // Each line variables //
     int line_n; // length of each line
     int line_indx; // index of each line
     std::string line; // each line stored for processing
 
     int variable_indx = 0;
+    
+    // Loop Variables //
+    int loop_indx = 0;
+    std::unordered_map<int, std::pair<std::pair<int, std::string>, std::vector<std::string>>> loops; // loop_indx, {{variable_indx, variable_name}, instructions} ! NOT IN USE !
     std::string loop_variable_name; // some loop variable
     int loop_variable_indx = 0;
     std::vector<std::string> loop; // each line in the loop is stored here
+
+    // Function Variables // 
+    std::vector<std::string> function_names;
+    std::unordered_map<std::string, std::pair<std::vector<std::pair<variable_types, std::string>>, std::vector<std::string>>> functions; // function name -> pair{ vector{pair{variable_type, variable_name }}, vector{instructions} }
     
     // Types of what each argument can be
     // "hehe" -> string
@@ -112,6 +122,8 @@ private:
         else if ( instruction.first == "div" )    { }
         else if ( instruction.first == "for")     { For(instruction.second); }
         else if ( instruction.first == "end")     {}
+        else if ( instruction.first == "def")    { Def(instruction.second); }
+        else if ( std::find(function_names.begin(), function_names.end(), instruction.first) != function_names.end() ) { Run_Function(instruction.first, instruction.second); }
         else {
             console.Print(console.error, "Instruction not recognised ->" + instruction.first, line_indx);
             return;
@@ -433,6 +445,9 @@ private:
         if ( end_inf.first != argument_types::number ) { console.Print(console.error, "3st argumnet (end) must be variable -> " + end_inf.second, line_indx); return 1;}
         if ( step_inf.first != argument_types::number ) { console.Print(console.error, "4st argumnet (step) must be variable -> " + step_inf.second, line_indx); return 1; }
 
+        // std::unordered_map<int, std::pair<std::pair<int, std::string>, std::vector<std::string>>> loops; // loop_indx, {{variable_indx, variable_name}, instructions}
+        //loops[loop_indx] = {{variable_indx, variable_inf.second}, {}};
+        //loop_indx += 1;   
         while ( std::getline(file, line) && line != "end" ) {
             std::cout << "Line: " << line << '\n';
             loop.push_back(line);
@@ -464,6 +479,118 @@ private:
         }
         variable_names.erase(loop_variable_name);
         int_values.erase(loop_variable_indx);
+    }
+
+    variable_types Get_Function_Argument_Type(std::string s) {
+        if ( s == "int" ) { return variable_types::int_; }
+        else if ( s == "string" ) { return variable_types::string_; }
+        else if ( s == "float" ) { return variable_types::float_; }
+        else {
+            return variable_types::error;
+        }
+    }
+
+    int Def(int &poi) {
+        // std::unordered_map<std::string, std::pair<std::vector<std::pair<variable_types, std::string>>, std::vector<std::string>>> functions;
+        std::pair<argument_types, std::string> function_name = Get_Argument(poi);
+        
+        // Getting function variables
+        if ( dic_find(functions, function_name.second) ) {console.Print(console.error, "Function already exists -> " + function_name.second, line_indx); return 1;}
+        functions[function_name.second] = { {}, {} };
+        variable_types temp_variable_type;
+        while (poi < line_n) {
+            std::pair<argument_types, std::string> argumnet_type = Get_Argument(poi);
+            std::pair<argument_types, std::string> argumnet_name = Get_Argument(poi);
+
+            temp_variable_type = Get_Function_Argument_Type(argumnet_type.second);
+
+            functions[function_name.second].first.push_back({temp_variable_type, argumnet_name.second});
+            variable_names[argumnet_name.second] = {temp_variable_type, variable_indx};
+
+            if (temp_variable_type == variable_types::error ) { console.Print(console.error, "invalid variable type -> " + argumnet_type.second, line_indx); return 1; }
+
+            if ( temp_variable_type == variable_types::int_ ) {
+                int_values[variable_indx] = 0;
+            }
+            else if ( temp_variable_type == variable_types::string_ ) {
+                string_values[variable_indx] = "";
+            }
+            else if ( temp_variable_type == variable_types::float_ ) {
+                float_values[variable_indx] = 0;
+            }
+
+            variable_indx++;
+            std::cout << argumnet_type.second << ' ' << argumnet_name.second << '\n';
+        }
+
+        // Storing function functionality
+        while ( std::getline(file, line) && line != "end" ) {
+            functions[function_name.second].second.push_back(line);
+            line_indx++;
+        }
+
+        function_names.push_back(function_name.second);
+        return 0;
+    }
+
+    std::string String_Argument_Type(argument_types arg) {
+        if (arg == argument_types::number ) { return "Number"; }
+        else if (arg == argument_types::string ) { return "String"; }
+        //else if (arg == argument_types:: ) { return "Number"; }
+        else { return ""; }
+    }
+
+    int Run_Function(std::string function_name, int &poi) {
+        // std::unordered_map<std::string, std::pair<std::vector<std::pair<variable_types, std::string>>, std::vector<std::string>>> functions; // function name -> pair{ vector{pair{variable_type, variable_name }}, vector{instructions} }
+        // quick time  | 
+        int var_poi = 0;
+        int n = 0;
+        std::vector<std::pair<argument_types, std::string>> variables = {};
+        while( poi < line_n ) {
+            std::pair<argument_types, std::string> variable_input = Get_Argument(poi);
+            variables.push_back(variable_input);
+            n++;
+            std::cout << variable_input.second << '\n';
+        }
+
+
+        // Process function variables
+        for ( std::pair<variable_types, std::string> var : functions[function_name].first ) {
+            if ( var_poi >= n ) { console.Print(console.error, "Too many paramiters ->" + var.second, line_indx); }
+            if ( var.first == variable_types::int_ && variables[var_poi].first == argument_types::number) {
+                int_values[variable_names[var.second].first] = std::stoi(variables[var_poi].second);
+            }
+            else if ( var.first == variable_types::string_ && variables[var_poi].first == argument_types::string ) {
+                string_values[variable_names[var.second].first] = variables[var_poi].second;
+            }
+            else {
+                console.Print(console.error, "Types not compatipable -> " + String_Type(var.first) + " and " + String_Argument_Type(variables[var_poi].first), line_indx);
+                return 1;
+            }
+            var_poi++;
+
+        }
+
+        std::cout << "Function: " << '\n';
+        for (std::string lin : functions[function_name].second ) {
+            std::cout << lin << '\n';
+        }
+        std::cout << "end" << '\n';
+        std::cout << "Function paramiters: \n";
+        for (auto var_inf : functions[function_name].first ) {
+            std::cout << var_inf.second << '\n';
+        }
+        std::cout << "end\n";
+
+        // Process function
+        for ( std::string lin : functions[function_name].second ) {
+            std::cout << "line: " + lin + '\n';
+            Each_Line_Process(lin);
+        }
+
+        
+
+        return 0;
     }
 };
 
